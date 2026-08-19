@@ -10,8 +10,6 @@
 
 Quorum takes an LLM output and tries to find what's wrong with it. Three critic agents look it over at the same time: one checks the facts, one checks the reasoning, one checks whether the response actually answers what was asked. When they disagree about something, an adjudicator reads through the disagreement, decides who's right, and writes up a verdict with a confidence score and the specific evidence behind each flagged issue.
 
-Most portfolio projects in this space are demos of generation, another chatbot, another summarizer. This one is a demo of evaluation: judging whether an output is actually good. That's a skill that matters a lot once a system is running in production, and it doesn't show up in many portfolios.
-
 ![Demo: submitting an output, watching the critics dispatch in parallel, and the verdict resolving](docs/screenshots/quorum-demo.gif)
 
 *A genuine run against real Groq and Mistral models, nothing mocked. Full-size screenshots further down.*
