@@ -8,9 +8,9 @@
 
 > A quorum is the minimum number of independent members needed before a decision counts. Here, three of them are AI models.
 
-Quorum is a multi-agent evaluation pipeline built to catch bad LLM outputs rather than produce more of them. Three separate critic agents, one for factual accuracy, one for logical consistency, and one for completeness, examine any LLM-generated output at the same time. An adjudicator then works through whatever they disagree about, and the outcome is a single verdict carrying a confidence score and evidence-backed callouts, not a number pulled from a black box.
+Quorum takes an LLM output and tries to find what's wrong with it. Three critic agents look it over at the same time: one checks the facts, one checks the reasoning, one checks whether the response actually answers what was asked. When they disagree about something, an adjudicator reads through the disagreement, decides who's right, and writes up a verdict with a confidence score and the specific evidence behind each flagged issue.
 
-Most AI portfolio projects show off generation. This one shows off evaluation instead, which happens to be the skill AI teams are actively hiring for and rarely find in candidates.
+Most portfolio projects in this space are demos of generation, another chatbot, another summarizer. This one is a demo of evaluation: judging whether an output is actually good. That's a skill that matters a lot once a system is running in production, and it doesn't show up in many portfolios.
 
 ![Demo: submitting an output, watching the critics dispatch in parallel, and the verdict resolving](docs/screenshots/quorum-demo.gif)
 
@@ -35,7 +35,7 @@ Most AI portfolio projects show off generation. This one shows off evaluation in
 ## Features
 
 - **Three independently modeled critics** covering accuracy, logic, and completeness, each routed through a different provider so their blind spots never line up
-- **An adjudicator** that works through every disagreement and produces one confidence-scored verdict, complete with confirmed issues and explicitly dismissed flags, rather than a simple average
+- **An adjudicator** that reads through every disagreement, decides what to confirm and what to dismiss, and writes up one verdict with a confidence score attached
 - **Parallel critic dispatch** through LangGraph, with automatic retries, graceful degradation whenever a critic fails, and a short-circuit path that skips straight to a clean verdict when nothing is wrong
 - **A deterministic offline mock mode**, where the entire pipeline (dispatch, disagreement detection, adjudication, storage, API, UI) runs from start to finish without a single API key
 - **A Streamlit Verdict Explorer** featuring inline, color-coded annotations, a batch mode, a searchable history, and analytics tracking critic behavior across runs
@@ -111,7 +111,7 @@ Set `ARBITRATION_PROVIDER_MODE=live` (see `.env.example`) and provide:
 - `GROQ_API_KEY`, which powers the accuracy critic and the completeness critic ([console.groq.com](https://console.groq.com))
 - `MISTRAL_API_KEY`, which powers the logic critic and the adjudicator ([console.mistral.ai](https://console.mistral.ai))
 
-Groq, Mistral, NVIDIA NIM, and OpenAI all expose an OpenAI-compatible `/chat/completions` endpoint, and so does a self-hosted Ollama, which means `arbitration/providers.py` can talk to any of them through a single code path. Only the base URL, API key, and model name differ per provider, each one configurable per critic through environment variables. Structured output is enforced end to end using [`instructor`](https://github.com/jxnl/instructor) in JSON mode, so every critic and the adjudicator hand back validated Pydantic models instead of raw text that needs parsing. A critic with a missing or invalid key, or a request that runs past `CRITIC_REQUEST_TIMEOUT_SECONDS` (30 seconds by default), simply fails that one critic and degrades gracefully rather than taking the whole run down with it.
+Groq, Mistral, NVIDIA NIM, and OpenAI all expose an OpenAI-compatible `/chat/completions` endpoint, and so does a self-hosted Ollama, which means `arbitration/providers.py` can talk to any of them through a single code path. Only the base URL, API key, and model name differ per provider, each one configurable per critic through environment variables. Structured output is enforced end to end using [`instructor`](https://github.com/jxnl/instructor) in JSON mode, so every critic and the adjudicator hand back validated Pydantic models instead of raw text that needs parsing. A critic with a missing or invalid key, or a request that runs past `CRITIC_REQUEST_TIMEOUT_SECONDS` (30 seconds by default), just fails on its own. It doesn't take the whole run down with it.
 
 **A note on client construction and threading:** the first time a given provider's client gets built, constructing its underlying `httpx`/SSL context can deadlock if several threads attempt it at once, and that is exactly what LangGraph's parallel critic dispatch does on the very first call. `providers.py` guards against this with a lock and a cache. Only one thread ever constructs a given provider's client; every other caller, concurrent or not, simply reuses it, and actual concurrent *requests* made against an already-built client stay unaffected.
 
