@@ -12,9 +12,12 @@ Quorum is a multi-agent evaluation pipeline that catches bad LLM outputs instead
 
 Most AI portfolio projects demonstrate generation. This one demonstrates evaluation — the skill AI teams are actively hiring for and rarely see in candidates.
 
+![Verdict view: annotated output with confirmed issues, dismissed flags, and an adjudicator summary](docs/screenshots/verdict-view.jpg)
+
 ## Table of contents
 
 - [Features](#features)
+- [Screenshots](#screenshots)
 - [Architecture](#architecture)
 - [Why three critics instead of one self-review pass](#why-three-critics-instead-of-one-self-review-pass)
 - [Tech stack](#tech-stack)
@@ -197,6 +200,16 @@ Every arbitration is persisted as a full JSON audit trail in SQLite
 - **Analytics** — meta-analysis across every run: which critic finds the most
   issues, which critic gets overruled by the adjudicator most often, disagreement
   type breakdown, and critic failure rates.
+
+## Screenshots
+
+**Critic comparison** — accuracy and completeness disagree with each other while logic agrees with neither, each with its own score, confidence, and reasoning:
+
+![Critic comparison panel showing three critics with agreement/disagreement badges](docs/screenshots/critic-comparison.jpg)
+
+**Analytics** — meta-analysis across every arbitration run so far: disagreement rate, short-circuit rate, and issues raised per critic:
+
+![Analytics dashboard with disagreement rate, short-circuit rate, and per-critic issue counts](docs/screenshots/analytics.jpg)
 
 ## Test cases
 
