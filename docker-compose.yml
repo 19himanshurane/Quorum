@@ -1,0 +1,64 @@
+services:
+  api:
+    build: .
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    environment:
+      ARBITRATION_PROVIDER_MODE: ${ARBITRATION_PROVIDER_MODE:-mock}
+      ARBITRATION_DB_PATH: /app/data/arbitration.db
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
+      NVIDIA_API_KEY: ${NVIDIA_API_KEY:-}
+      ACCURACY_CRITIC_PROVIDER: ${ACCURACY_CRITIC_PROVIDER:-groq}
+      ACCURACY_CRITIC_MODEL: ${ACCURACY_CRITIC_MODEL:-openai/gpt-oss-120b}
+      LOGIC_CRITIC_PROVIDER: ${LOGIC_CRITIC_PROVIDER:-mistral}
+      LOGIC_CRITIC_MODEL: ${LOGIC_CRITIC_MODEL:-mistral-large-latest}
+      COMPLETENESS_CRITIC_PROVIDER: ${COMPLETENESS_CRITIC_PROVIDER:-groq}
+      COMPLETENESS_CRITIC_MODEL: ${COMPLETENESS_CRITIC_MODEL:-qwen/qwen3.6-27b}
+      ADJUDICATOR_PROVIDER: ${ADJUDICATOR_PROVIDER:-mistral}
+      ADJUDICATOR_MODEL: ${ADJUDICATOR_MODEL:-mistral-large-latest}
+      OLLAMA_BASE_URL: http://ollama:11434/v1
+      CRITIC_REQUEST_TIMEOUT_SECONDS: ${CRITIC_REQUEST_TIMEOUT_SECONDS:-30}
+    volumes:
+      - arbitration-data:/app/data
+
+  ui:
+    build: .
+    command: streamlit run ui/streamlit_app.py --server.address 0.0.0.0 --server.port 8501
+    ports:
+      - "8501:8501"
+    environment:
+      ARBITRATION_PROVIDER_MODE: ${ARBITRATION_PROVIDER_MODE:-mock}
+      ARBITRATION_DB_PATH: /app/data/arbitration.db
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
+      NVIDIA_API_KEY: ${NVIDIA_API_KEY:-}
+      ACCURACY_CRITIC_PROVIDER: ${ACCURACY_CRITIC_PROVIDER:-groq}
+      ACCURACY_CRITIC_MODEL: ${ACCURACY_CRITIC_MODEL:-openai/gpt-oss-120b}
+      LOGIC_CRITIC_PROVIDER: ${LOGIC_CRITIC_PROVIDER:-mistral}
+      LOGIC_CRITIC_MODEL: ${LOGIC_CRITIC_MODEL:-mistral-large-latest}
+      COMPLETENESS_CRITIC_PROVIDER: ${COMPLETENESS_CRITIC_PROVIDER:-groq}
+      COMPLETENESS_CRITIC_MODEL: ${COMPLETENESS_CRITIC_MODEL:-qwen/qwen3.6-27b}
+      ADJUDICATOR_PROVIDER: ${ADJUDICATOR_PROVIDER:-mistral}
+      ADJUDICATOR_MODEL: ${ADJUDICATOR_MODEL:-mistral-large-latest}
+      OLLAMA_BASE_URL: http://ollama:11434/v1
+      CRITIC_REQUEST_TIMEOUT_SECONDS: ${CRITIC_REQUEST_TIMEOUT_SECONDS:-30}
+    volumes:
+      - arbitration-data:/app/data
+
+  # Optional local model host - only needed if you point a critic's *_PROVIDER
+  # at "ollama" instead of groq/mistral/nvidia. Not required by the default
+  # config above, and not started unless you request the "local" profile:
+  #   docker compose --profile local up
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["local"]
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-models:/root/.ollama
+
+volumes:
+  arbitration-data:
+  ollama-models:

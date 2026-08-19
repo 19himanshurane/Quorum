@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+data/*.db
+data/test_case_results.json
+data/test_case_results.md
+.env
+.streamlit/secrets.toml
+*.egg-info/
+.claude/
