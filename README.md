@@ -8,13 +8,13 @@
 
 > A quorum is the minimum number of independent members needed before a decision counts. Here, three of them are AI models.
 
-Quorum is a multi-agent evaluation pipeline that catches bad LLM outputs instead of generating more of them. Three independent critic agents — factual accuracy, logical consistency, completeness — evaluate any LLM-generated output in parallel, an adjudicator resolves what they disagree on, and the result is a single confidence-scored verdict with evidence-backed callouts, not a black-box score.
+Quorum is a multi-agent evaluation pipeline built to catch bad LLM outputs rather than produce more of them. Three separate critic agents, one for factual accuracy, one for logical consistency, and one for completeness, examine any LLM-generated output at the same time. An adjudicator then works through whatever they disagree about, and the outcome is a single verdict carrying a confidence score and evidence-backed callouts, not a number pulled from a black box.
 
-Most AI portfolio projects demonstrate generation. This one demonstrates evaluation — the skill AI teams are actively hiring for and rarely see in candidates.
+Most AI portfolio projects show off generation. This one shows off evaluation instead, which happens to be the skill AI teams are actively hiring for and rarely find in candidates.
 
 ![Demo: submitting an output, watching the critics dispatch in parallel, and the verdict resolving](docs/screenshots/quorum-demo.gif)
 
-*Live run against real Groq + Mistral models — no mocking. Full-size screenshots below.*
+*A genuine run against real Groq and Mistral models, nothing mocked. Full-size screenshots further down.*
 
 ## Table of contents
 
@@ -34,69 +34,40 @@ Most AI portfolio projects demonstrate generation. This one demonstrates evaluat
 
 ## Features
 
-- **Three independently-modeled critics** (accuracy / logic / completeness), routed through different providers so their blind spots don't overlap
-- **An adjudicator** that reasons through disagreements into one confidence-scored verdict — confirmed issues and explicitly dismissed flags, not a naive average
-- **Parallel critic dispatch** via LangGraph, with automatic retries, graceful degradation on critic failure, and a short-circuit fast path for clean outputs
-- **A deterministic offline mock mode** — the entire pipeline (dispatch, disagreement detection, adjudication, storage, API, UI) runs end to end with zero API keys
-- **A Streamlit Verdict Explorer** with inline color-coded annotations, batch mode, full history, and cross-run analytics on critic behavior
-- **A documented FastAPI service** backed by a full SQLite audit trail
+- **Three independently modeled critics** covering accuracy, logic, and completeness, each routed through a different provider so their blind spots never line up
+- **An adjudicator** that works through every disagreement and produces one confidence-scored verdict, complete with confirmed issues and explicitly dismissed flags, rather than a simple average
+- **Parallel critic dispatch** through LangGraph, with automatic retries, graceful degradation whenever a critic fails, and a short-circuit path that skips straight to a clean verdict when nothing is wrong
+- **A deterministic offline mock mode**, where the entire pipeline (dispatch, disagreement detection, adjudication, storage, API, UI) runs from start to finish without a single API key
+- **A Streamlit Verdict Explorer** featuring inline, color-coded annotations, a batch mode, a searchable history, and analytics tracking critic behavior across runs
+- **A documented FastAPI service** with a full SQLite audit trail behind it
 - **A one-command Docker Compose setup**
 
 ## Architecture
 
-```
-                        ┌──────────────┐
-                        │  parse_input │
-                        └──────┬───────┘
-                 ┌─────────────┼─────────────┐
-                 ▼             ▼             ▼
-         ┌───────────┐ ┌───────────┐ ┌────────────────┐
-         │ accuracy  │ │  logic    │ │  completeness   │   <- run in parallel,
-         │ critic    │ │  critic   │ │  critic         │      different model
-         │ (Groq)    │ │ (Mistral) │ │ (Groq)          │      per critic
-         └─────┬─────┘ └─────┬─────┘ └────────┬────────┘
-                 └─────────────┼─────────────┘
-                                ▼
-                     ┌────────────────────┐
-                     │ collect_critiques  │  (fan-in)
-                     └─────────┬──────────┘
-                                ▼
-                     ┌────────────────────┐
-                     │ detect_disagreements│
-                     └─────────┬──────────┘
-              ┌─────────────────┼─────────────────┐
-              ▼                 ▼                 ▼
-        all critics        no disagreements   otherwise
-        failed                & all clean
-              │                 │                 │
-              ▼                 ▼                 ▼
-     all_failed_verdict  short_circuit_verdict  adjudicate
-              └─────────────────┼─────────────────┘
-                                ▼
-                     ┌────────────────────┐
-                     │ synthesize_verdict │
-                     └────────────────────┘
+```mermaid
+flowchart LR
+    A[parse_input] --> B["accuracy critic (Groq)"]
+    A --> C["logic critic (Mistral)"]
+    A --> D["completeness critic (Groq)"]
+    B --> E[collect_critiques]
+    C --> E
+    D --> E
+    E --> F[detect_disagreements]
+    F -->|all critics failed| G[all_failed_verdict]
+    F -->|clean, no disagreement| H[short_circuit_verdict]
+    F -->|otherwise| I[adjudicate]
+    G --> J[synthesize_verdict]
+    H --> J
+    I --> J
 ```
 
-Critics are deliberately routed through **different model families** so their
-blind spots don't overlap: accuracy → Groq (`openai/gpt-oss-120b`), logic →
-Mistral (`mistral-large-latest`), completeness → Groq again but on a different
-model (`qwen/qwen3.6-27b`). If all three used the same model, they'd share the
-same blind spots — the disagreements between models are the most valuable
-signal this system produces. Every provider/model is overridable via env vars
-(see `.env.example`), including pointing any critic at NVIDIA NIM, OpenAI, or a
-self-hosted Ollama model instead. (NVIDIA NIM was the original pick for the
-completeness critic, matching a 3-provider design, but its free tier proved too
-slow/queued in practice - observed 51s-180s+ per call, occasionally longer than
-useful - so it was swapped for a second Groq model, which is fast and reliable.)
+**[Open the interactive version →](https://claude.ai/code/artifact/b7113e91-ac3e-4b28-acb5-f37619d36e65)** Click any stage to see exactly what it does and which file it lives in.
+
+Critics are deliberately routed through **different model families** so their blind spots never line up: accuracy runs on Groq (`openai/gpt-oss-120b`), logic runs on Mistral (`mistral-large-latest`), and completeness runs on Groq again, though on a separate model (`qwen/qwen3.6-27b`). Had all three shared a single model, they would have shared its blind spots too, and it turns out the disagreements between distinct models are the most valuable signal the whole system produces. Every provider and model can be swapped through environment variables (see `.env.example`), including pointing any critic at NVIDIA NIM, OpenAI, or a self-hosted Ollama instance instead. NVIDIA NIM was actually the original choice for the completeness critic, fitting a neat three-provider design, but its free tier turned out to be far too slow in practice: calls regularly took anywhere from 51 to 180 seconds, sometimes longer, so it got swapped out for a second Groq model that responds quickly and reliably.
 
 ## Why three critics instead of one self-review pass
 
-A single model reviewing its own output shares that output's blind spots. Three
-independently-prompted, independently-modeled critics, each scoped to one
-dimension (accuracy / logic / completeness), catch different failure modes and
-disagree often enough that the disagreements themselves become a diagnostic
-signal — tracked in the Analytics tab.
+A single model reviewing its own output tends to share that output's blind spots. Three independently prompted critics, each modeled separately and scoped to one dimension (accuracy, logic, completeness), catch different failure modes instead, and they disagree often enough that those disagreements become a diagnostic signal in their own right, one the Analytics tab tracks over time.
 
 ## Tech stack
 
@@ -104,7 +75,7 @@ signal — tracked in the Analytics tab.
 | ---------------------- | ------------------------------------------------- |
 | Language               | Python 3.11+                                       |
 | Agent orchestration    | [LangGraph](https://github.com/langchain-ai/langgraph) |
-| LLM providers          | Groq, Mistral — NVIDIA NIM, OpenAI, Ollama also supported |
+| LLM providers          | Groq and Mistral (NVIDIA NIM, OpenAI, and Ollama are also supported) |
 | Structured output      | Pydantic + [`instructor`](https://github.com/jxnl/instructor) |
 | Storage                | SQLite                                             |
 | API                    | FastAPI                                            |
@@ -114,10 +85,7 @@ signal — tracked in the Analytics tab.
 
 ## Quickstart (no API keys required)
 
-The system ships with a deterministic **mock provider mode** — offline,
-zero-cost stand-in critics that exercise the full pipeline (parallel dispatch,
-disagreement detection, adjudication, storage, API, UI) so anyone can run it
-end-to-end without paid API keys. This is the default (`ARBITRATION_PROVIDER_MODE=mock`).
+The system ships with a deterministic **mock provider mode**: offline, zero-cost stand-in critics that exercise the full pipeline (parallel dispatch, disagreement detection, adjudication, storage, API, UI), letting anyone run it end to end without paying for a single API call. This is the default (`ARBITRATION_PROVIDER_MODE=mock`).
 
 ```bash
 python -m venv .venv
@@ -140,27 +108,12 @@ uvicorn api.main:app --reload
 
 Set `ARBITRATION_PROVIDER_MODE=live` (see `.env.example`) and provide:
 
-- `GROQ_API_KEY` — for the accuracy critic and the completeness critic ([console.groq.com](https://console.groq.com))
-- `MISTRAL_API_KEY` — for the logic critic and the adjudicator ([console.mistral.ai](https://console.mistral.ai))
+- `GROQ_API_KEY`, which powers the accuracy critic and the completeness critic ([console.groq.com](https://console.groq.com))
+- `MISTRAL_API_KEY`, which powers the logic critic and the adjudicator ([console.mistral.ai](https://console.mistral.ai))
 
-Groq, Mistral, NVIDIA NIM, and OpenAI all expose an OpenAI-compatible
-`/chat/completions` endpoint (as does a self-hosted Ollama), so
-`arbitration/providers.py` talks to any of them through one code path — only
-the base URL, API key, and model name differ per provider, configurable per
-critic via env vars. Structured output is enforced end-to-end via
-[`instructor`](https://github.com/jxnl/instructor) in JSON mode, so every critic
-and the adjudicator return validated Pydantic models — never raw text to parse.
-A critic with a missing/invalid key, or a request that exceeds
-`CRITIC_REQUEST_TIMEOUT_SECONDS` (default 30s), fails that one critic gracefully
-(see graceful degradation, above) rather than crashing the run.
+Groq, Mistral, NVIDIA NIM, and OpenAI all expose an OpenAI-compatible `/chat/completions` endpoint, and so does a self-hosted Ollama, which means `arbitration/providers.py` can talk to any of them through a single code path. Only the base URL, API key, and model name differ per provider, each one configurable per critic through environment variables. Structured output is enforced end to end using [`instructor`](https://github.com/jxnl/instructor) in JSON mode, so every critic and the adjudicator hand back validated Pydantic models instead of raw text that needs parsing. A critic with a missing or invalid key, or a request that runs past `CRITIC_REQUEST_TIMEOUT_SECONDS` (30 seconds by default), simply fails that one critic and degrades gracefully rather than taking the whole run down with it.
 
-**A note on client construction and threading:** the first time a given
-provider's client is built, constructing its underlying `httpx`/SSL context can
-deadlock if done concurrently from multiple threads — which is exactly what
-LangGraph's parallel critic dispatch does on the very first call. `providers.py`
-guards this with a lock and a cache: only one thread ever constructs a given
-provider's client, every other caller (concurrent or not) reuses it, and actual
-concurrent *requests* against an already-built client are unaffected.
+**A note on client construction and threading:** the first time a given provider's client gets built, constructing its underlying `httpx`/SSL context can deadlock if several threads attempt it at once, and that is exactly what LangGraph's parallel critic dispatch does on the very first call. `providers.py` guards against this with a lock and a cache. Only one thread ever constructs a given provider's client; every other caller, concurrent or not, simply reuses it, and actual concurrent *requests* made against an already-built client stay unaffected.
 
 ## Docker
 
@@ -170,12 +123,7 @@ docker compose up --build
 # ui  -> http://localhost:8501
 ```
 
-Defaults to mock mode so `docker compose up` works with no keys at all; put
-`ARBITRATION_PROVIDER_MODE=live` plus `GROQ_API_KEY` / `MISTRAL_API_KEY` in a
-`.env` file to go live. An optional local Ollama service is included behind a
-compose profile if you'd rather self-host one critic:
-`docker compose --profile local up` (then `docker compose exec ollama ollama pull <model>`
-and point that critic's `*_PROVIDER=ollama`).
+It defaults to mock mode, so `docker compose up` works with no keys at all. Add `ARBITRATION_PROVIDER_MODE=live` plus `GROQ_API_KEY` and `MISTRAL_API_KEY` to a `.env` file to go live. An optional local Ollama service sits behind a compose profile for anyone who would rather self-host one critic: run `docker compose --profile local up`, then `docker compose exec ollama ollama pull <model>`, and point that critic's `*_PROVIDER` at `ollama`.
 
 ## API reference
 
@@ -188,43 +136,33 @@ and point that critic's `*_PROVIDER=ollama`).
 | `GET`  | `/v1/arbitrations/count`      | Total arbitrations recorded |
 | `GET`  | `/v1/health`                  | Health check + current provider mode |
 
-Full interactive OpenAPI docs are served at `/docs` once the API is running.
-Every arbitration is persisted as a full JSON audit trail in SQLite
-(`data/arbitration.db`).
+Full interactive OpenAPI docs live at `/docs` once the API is running, and every arbitration gets persisted as a complete JSON audit trail in SQLite (`data/arbitration.db`).
 
 ## Verdict Explorer UI (Streamlit)
 
-- **Arbitrate** — submit a single output/prompt pair, see the output with inline
-  color-coded annotations (🔴 confirmed issue, 🟡 dismissed/low-confidence flag,
-  🟢 explicitly validated claim) plus a side-by-side critic comparison panel.
-- **Batch** — submit a CSV or pasted set of outputs, get a sortable results table.
-- **History** — browse every past arbitration from the SQLite audit trail.
-- **Analytics** — meta-analysis across every run: which critic finds the most
-  issues, which critic gets overruled by the adjudicator most often, disagreement
-  type breakdown, and critic failure rates.
+- **Arbitrate**: submit a single output/prompt pair and see the output rendered with inline, color-coded annotations (🔴 confirmed issue, 🟡 dismissed/low-confidence flag, 🟢 explicitly validated claim), alongside a side-by-side critic comparison panel.
+- **Batch**: submit a CSV or a pasted set of outputs and get back a sortable results table.
+- **History**: browse every past arbitration straight from the SQLite audit trail.
+- **Analytics**: a meta-analysis across every run, covering which critic finds the most issues, which one gets overruled by the adjudicator most often, how disagreement types break down, and how often each critic fails outright.
 
 ## Screenshots
 
-**Critic comparison** — accuracy and completeness disagree with each other while logic agrees with neither, each with its own score, confidence, and reasoning:
+**Critic comparison**: accuracy and completeness disagree with each other while logic sides with neither, each carrying its own score, confidence, and reasoning.
 
 ![Critic comparison panel showing three critics with agreement/disagreement badges](docs/screenshots/critic-comparison.jpg)
 
-**Analytics** — meta-analysis across every arbitration run so far: disagreement rate, short-circuit rate, and issues raised per critic:
+**Analytics**: a meta-analysis across every arbitration run so far, covering disagreement rate, short-circuit rate, and issues raised per critic.
 
 ![Analytics dashboard with disagreement rate, short-circuit rate, and per-critic issue counts](docs/screenshots/analytics.jpg)
 
 ## Test cases
 
-`scripts/run_test_cases.py` runs four canned cases end-to-end and writes results
-to `data/test_case_results.{json,md}`:
+`scripts/run_test_cases.py` runs four canned cases end-to-end and writes results to `data/test_case_results.{json,md}`:
 
-1. **factually_incorrect** — three planted factual errors, caught by the accuracy critic.
-2. **logically_flawed** — hasty generalization, false dichotomy, circular reasoning,
-   and a non-sequitur, caught by the logic critic.
-3. **misses_the_point** — technically answers half the question, caught by the
-   completeness critic while accuracy/logic stay clean.
-4. **genuinely_good** — a clean, accurate, well-reasoned, complete response —
-   all three critics agree, adjudication is short-circuited, clean bill of health.
+1. **factually_incorrect**: three planted factual errors, caught by the accuracy critic.
+2. **logically_flawed**: hasty generalization, false dichotomy, circular reasoning, and a non-sequitur, all caught by the logic critic.
+3. **misses_the_point**: technically answers half the question, caught by the completeness critic while accuracy and logic stay clean.
+4. **genuinely_good**: a clean, accurate, well-reasoned, complete response. All three critics agree, adjudication short-circuits, and the result is a clean bill of health.
 
 ## Testing
 
@@ -233,10 +171,7 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-Covers structured-output validation, disagreement-detection rules (issue
-presence / severity gap / unique finding / score gap), the LangGraph routing
-(clean short-circuit, normal adjudication, partial critic failure with graceful
-degradation, total critic failure), SQLite round-trips, and the FastAPI routes.
+It covers structured-output validation, the four disagreement-detection rules (issue presence, severity gap, unique finding, score gap), every LangGraph routing path (clean short-circuit, normal adjudication, partial critic failure with graceful degradation, total critic failure), SQLite round-trips, and the FastAPI routes themselves.
 
 ## License
 
