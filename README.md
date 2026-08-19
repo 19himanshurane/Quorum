@@ -12,7 +12,9 @@ Quorum is a multi-agent evaluation pipeline that catches bad LLM outputs instead
 
 Most AI portfolio projects demonstrate generation. This one demonstrates evaluation — the skill AI teams are actively hiring for and rarely see in candidates.
 
-![Verdict view: annotated output with confirmed issues, dismissed flags, and an adjudicator summary](docs/screenshots/verdict-view.jpg)
+![Demo: submitting an output, watching the critics dispatch in parallel, and the verdict resolving](docs/screenshots/quorum-demo.gif)
+
+*Live run against real Groq + Mistral models — no mocking. Full-size screenshots below.*
 
 ## Table of contents
 
