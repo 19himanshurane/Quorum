@@ -1,15 +1,41 @@
 # Quorum
 
-*A quorum is the minimum number of independent members needed before a decision counts. Here, three of them are AI models.*
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![LangGraph](https://img.shields.io/badge/orchestration-LangGraph-1C3C3C)](https://github.com/langchain-ai/langgraph)
+[![FastAPI](https://img.shields.io/badge/api-FastAPI-009688)](https://fastapi.tiangolo.com/)
+[![Streamlit](https://img.shields.io/badge/UI-Streamlit-FF4B4B)](https://streamlit.io/)
 
-I built a system where AI models audit each other's work. Three specialized critics
-independently evaluate any LLM output, and an adjudicator resolves their
-disagreements into a single confidence-scored verdict with actionable callouts.
+> A quorum is the minimum number of independent members needed before a decision counts. Here, three of them are AI models.
 
-Instead of building yet another system that generates answers, this one catches bad
-answers — routing any LLM-generated output to three competing critic agents
-(factual accuracy, logical consistency, completeness), detecting where they
-disagree, and synthesizing their critiques into one verdict.
+Quorum is a multi-agent evaluation pipeline that catches bad LLM outputs instead of generating more of them. Three independent critic agents — factual accuracy, logical consistency, completeness — evaluate any LLM-generated output in parallel, an adjudicator resolves what they disagree on, and the result is a single confidence-scored verdict with evidence-backed callouts, not a black-box score.
+
+Most AI portfolio projects demonstrate generation. This one demonstrates evaluation — the skill AI teams are actively hiring for and rarely see in candidates.
+
+## Table of contents
+
+- [Features](#features)
+- [Architecture](#architecture)
+- [Why three critics instead of one self-review pass](#why-three-critics-instead-of-one-self-review-pass)
+- [Tech stack](#tech-stack)
+- [Quickstart](#quickstart-no-api-keys-required)
+- [Going live with real models](#going-live-with-real-models)
+- [Docker](#docker)
+- [API reference](#api-reference)
+- [Verdict Explorer UI](#verdict-explorer-ui-streamlit)
+- [Test cases](#test-cases)
+- [Testing](#testing)
+- [License](#license)
+
+## Features
+
+- **Three independently-modeled critics** (accuracy / logic / completeness), routed through different providers so their blind spots don't overlap
+- **An adjudicator** that reasons through disagreements into one confidence-scored verdict — confirmed issues and explicitly dismissed flags, not a naive average
+- **Parallel critic dispatch** via LangGraph, with automatic retries, graceful degradation on critic failure, and a short-circuit fast path for clean outputs
+- **A deterministic offline mock mode** — the entire pipeline (dispatch, disagreement detection, adjudication, storage, API, UI) runs end to end with zero API keys
+- **A Streamlit Verdict Explorer** with inline color-coded annotations, batch mode, full history, and cross-run analytics on critic behavior
+- **A documented FastAPI service** backed by a full SQLite audit trail
+- **A one-command Docker Compose setup**
 
 ## Architecture
 
@@ -66,6 +92,20 @@ independently-prompted, independently-modeled critics, each scoped to one
 dimension (accuracy / logic / completeness), catch different failure modes and
 disagree often enough that the disagreements themselves become a diagnostic
 signal — tracked in the Analytics tab.
+
+## Tech stack
+
+| Layer                 | Tool                                             |
+| ---------------------- | ------------------------------------------------- |
+| Language               | Python 3.11+                                       |
+| Agent orchestration    | [LangGraph](https://github.com/langchain-ai/langgraph) |
+| LLM providers          | Groq, Mistral — NVIDIA NIM, OpenAI, Ollama also supported |
+| Structured output      | Pydantic + [`instructor`](https://github.com/jxnl/instructor) |
+| Storage                | SQLite                                             |
+| API                    | FastAPI                                            |
+| UI                     | Streamlit                                          |
+| Testing                | pytest                                             |
+| Containerization       | Docker Compose                                     |
 
 ## Quickstart (no API keys required)
 
@@ -132,14 +172,18 @@ compose profile if you'd rather self-host one critic:
 `docker compose --profile local up` (then `docker compose exec ollama ollama pull <model>`
 and point that critic's `*_PROVIDER=ollama`).
 
-## API
+## API reference
 
-- `POST /v1/arbitrate` — `{"output": "...", "prompt": "..."}` → full `ArbitrationRecord`
-- `POST /v1/arbitrate/batch` — `{"items": [...]}` → list of records
-- `GET /v1/arbitrations/{id}` — retrieve a past verdict
-- `GET /v1/arbitrations` — list recent arbitrations
-- `GET /v1/arbitrations/count`, `GET /v1/health`
+| Method | Endpoint                     | Description                          |
+| ------ | ----------------------------- | ------------------------------------- |
+| `POST` | `/v1/arbitrate`               | Evaluate one output, returns a full `ArbitrationRecord` |
+| `POST` | `/v1/arbitrate/batch`         | Evaluate multiple outputs, returns a list of records |
+| `GET`  | `/v1/arbitrations/{id}`       | Retrieve a past verdict by id |
+| `GET`  | `/v1/arbitrations`            | List recent arbitrations |
+| `GET`  | `/v1/arbitrations/count`      | Total arbitrations recorded |
+| `GET`  | `/v1/health`                  | Health check + current provider mode |
 
+Full interactive OpenAPI docs are served at `/docs` once the API is running.
 Every arbitration is persisted as a full JSON audit trail in SQLite
 (`data/arbitration.db`).
 
@@ -178,3 +222,7 @@ Covers structured-output validation, disagreement-detection rules (issue
 presence / severity gap / unique finding / score gap), the LangGraph routing
 (clean short-circuit, normal adjudication, partial critic failure with graceful
 degradation, total critic failure), SQLite round-trips, and the FastAPI routes.
+
+## License
+
+Quorum is licensed under the [MIT License](LICENSE).
